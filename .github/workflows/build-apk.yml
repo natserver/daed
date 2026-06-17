@@ -1,0 +1,115 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Capacitor
+        run: pnpm add -D @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Build web app
+        run: pnpm build
+
+      - name: Prepare web dist
+        run: |
+          mkdir -p dist
+          cp -r apps/web/dist/* dist/
+
+      - name: Init Capacitor
+        run: |
+          cat > capacitor.config.ts << 'CAPCONFIG'
+          import type { CapacitorConfig } from '@capacitor/cli';
+
+          const config: CapacitorConfig = {
+            appId: 'com.natserver.daed',
+            appName: 'zdy',
+            webDir: 'dist',
+            server: {
+              androidScheme: 'https',
+            },
+          };
+
+          export default config;
+          CAPCONFIG
+
+          npx cap add android
+
+      - name: Sync web assets to Android
+        run: |
+          rm -rf android/app/src/main/assets/public
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+
+      - name: Generate app icon
+        run: |
+          if [ -f apps/web/public/logo-rounded.png ]; then
+            convert apps/web/public/logo-rounded.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+            convert apps/web/public/logo-rounded.png -resize 96x96 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+            convert apps/web/public/logo-rounded.png -resize 72x72 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+            convert apps/web/public/logo-rounded.png -resize 48x48 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+            convert apps/web/public/logo-rounded.png -resize 36x36 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          fi
+
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Build Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: daed-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: daed-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
