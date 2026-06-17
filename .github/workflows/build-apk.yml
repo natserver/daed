@@ -36,7 +36,7 @@ jobs:
           java-version: '21'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
