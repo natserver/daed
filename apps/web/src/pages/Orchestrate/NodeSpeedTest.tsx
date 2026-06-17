@@ -1,18 +1,14 @@
 import type { NodeLatencyProbeResult } from '~/apis'
-import { Zap, CheckCircle, AlertTriangle, Clock, BarChart3 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { CheckCircle, AlertTriangle, Clock, BarChart3 } from 'lucide-react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNodesQuery } from '~/apis'
 import { Section } from '~/components/Section'
-import { Button } from '~/components/ui/button'
-import { SimpleTooltip } from '~/components/ui/tooltip'
 import { cn } from '~/lib/utils'
 import { hasMeasuredLatency } from '~/utils/latency'
 
 interface NodeSpeedTestProps {
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
-  onTestAllNodeLatencies: () => Promise<void>
-  testingLatencies?: boolean
   lastLatencyProbeAt?: string | null
 }
 
@@ -26,78 +22,60 @@ interface NodeStats {
 
 export function NodeSpeedTest({
   nodeLatencies,
-  onTestAllNodeLatencies,
-  testingLatencies,
   lastLatencyProbeAt,
 }: NodeSpeedTestProps) {
   const { t } = useTranslation()
   const { data: nodesQuery } = useNodesQuery()
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [bestNode, setBestNode] = useState<NodeStats | null>(null)
-  const [stats, setStats] = useState<{
-    total: number
-    alive: number
-    fast: number
-    medium: number
-    slow: number
-    dead: number
-  } | null>(null)
 
   const nodes = useMemo(() => nodesQuery?.nodes.edges ?? [], [nodesQuery?.nodes.edges])
 
-  const getNodeStats = useCallback((nodeId: string): NodeStats => {
-    const node = nodes.find(n => n.id === nodeId)
-    const latency = nodeLatencies?.[nodeId]
-    
-    let status: NodeStats['status'] = 'unknown'
-    if (!latency || !hasMeasuredLatency(latency)) {
-      status = 'unknown'
-    } else if (!latency.alive) {
-      status = 'dead'
-    } else if (latency.latencyMs != null) {
-      if (latency.latencyMs < 100) status = 'fast'
-      else if (latency.latencyMs < 300) status = 'medium'
-      else status = 'slow'
-    }
+  const sortedNodeStats = useMemo(() => {
+    const nodeStats: NodeStats[] = nodes.map(node => {
+      const latency = nodeLatencies?.[node.id]
+      let status: NodeStats['status'] = 'unknown'
+      if (!latency || !hasMeasuredLatency(latency)) {
+        status = 'unknown'
+      } else if (!latency.alive) {
+        status = 'dead'
+      } else if (latency.latencyMs != null) {
+        if (latency.latencyMs < 100) status = 'fast'
+        else if (latency.latencyMs < 300) status = 'medium'
+        else status = 'slow'
+      }
+      return {
+        id: node.id,
+        name: node.tag || node.name || node.address || node.id,
+        latencyMs: latency?.latencyMs ?? null,
+        alive: latency?.alive ?? false,
+        status,
+      }
+    })
 
-    return {
-      id: nodeId,
-      name: node?.tag || node?.name || node?.address || nodeId,
-      latencyMs: latency?.latencyMs ?? null,
-      alive: latency?.alive ?? false,
-      status,
-    }
+    const statusOrder: Record<NodeStats['status'], number> = { fast: 0, medium: 1, slow: 2, dead: 3, unknown: 4 }
+    return nodeStats.sort((a, b) => {
+      const sa = statusOrder[a.status]
+      const sb = statusOrder[b.status]
+      if (sa !== sb) return sa - sb
+      return (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity)
+    })
   }, [nodes, nodeLatencies])
 
-  const analyzeNodes = useCallback(async () => {
-    setIsAnalyzing(true)
-    try {
-      const nodeStats = nodes.map(node => getNodeStats(node.id))
-      
-      const aliveNodes = nodeStats.filter(n => n.alive && n.latencyMs != null)
-      const fastNodes = aliveNodes.filter(n => n.status === 'fast')
-      const mediumNodes = aliveNodes.filter(n => n.status === 'medium')
-      const slowNodes = aliveNodes.filter(n => n.status === 'slow')
-      const deadNodes = nodeStats.filter(n => n.status === 'dead')
-
-      setStats({
-        total: nodeStats.length,
-        alive: aliveNodes.length,
-        fast: fastNodes.length,
-        medium: mediumNodes.length,
-        slow: slowNodes.length,
-        dead: deadNodes.length,
-      })
-
-      // Find the best node (lowest latency among alive nodes)
-      const bestCandidate = aliveNodes
-        .sort((a, b) => (a.latencyMs ?? Infinity) - (b.latencyMs ?? Infinity))[0]
-
-      setBestNode(bestCandidate || null)
-    } finally {
-      setIsAnalyzing(false)
+  const stats = useMemo(() => {
+    if (sortedNodeStats.length === 0) return null
+    const alive = sortedNodeStats.filter(n => n.alive && n.latencyMs != null)
+    return {
+      total: sortedNodeStats.length,
+      alive: alive.length,
+      fast: alive.filter(n => n.status === 'fast').length,
+      medium: alive.filter(n => n.status === 'medium').length,
+      slow: alive.filter(n => n.status === 'slow').length,
+      dead: sortedNodeStats.filter(n => n.status === 'dead').length,
     }
-  }, [nodes, getNodeStats])
+  }, [sortedNodeStats])
+
+  const bestNode = useMemo(() => {
+    return sortedNodeStats.find(n => n.alive && n.latencyMs != null) || null
+  }, [sortedNodeStats])
 
   const getStatusColor = (status: NodeStats['status']) => {
     switch (status) {
@@ -124,51 +102,18 @@ export function NodeSpeedTest({
       title={t('speedTest.title', 'Node Speed Test')}
       icon={<BarChart3 className="h-5 w-5" />}
       bordered
-      onCreate={() => {}}
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {t('speedTest.description', 'Analyze node performance and find the best node')}
-          </div>
-          <div className="flex items-center gap-2">
-            <SimpleTooltip label={t('speedTest.testAll', 'Test all node latencies')}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onTestAllNodeLatencies}
-                loading={testingLatencies}
-                disabled={testingLatencies}
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                {t('speedTest.testNow', 'Test Now')}
-              </Button>
-            </SimpleTooltip>
-            <SimpleTooltip label={t('speedTest.analyze', 'Analyze node performance')}>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={analyzeNodes}
-                loading={isAnalyzing}
-                disabled={isAnalyzing || !lastLatencyProbeAt}
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                {t('speedTest.analyze', 'Analyze')}
-              </Button>
-            </SimpleTooltip>
-          </div>
-        </div>
-
         {!lastLatencyProbeAt ? (
           <div className="text-center py-6 text-muted-foreground">
             <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">{t('speedTest.noTestData', 'No test data available. Click "Test Now" to start.')}</p>
+            <p className="text-sm">{t('speedTest.noTestData', 'No test data available.')}</p>
           </div>
         ) : (
           <>
             <div className="text-xs text-muted-foreground">
-              {t('speedTest.lastTest', 'Last test: {{time}}', { 
-                time: new Date(lastLatencyProbeAt).toLocaleString() 
+              {t('speedTest.lastTest', 'Last test: {{time}}', {
+                time: new Date(lastLatencyProbeAt).toLocaleString()
               })}
             </div>
 
@@ -210,6 +155,19 @@ export function NodeSpeedTest({
                     {getStatusLabel(bestNode.status)}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {sortedNodeStats.length > 0 && (
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {sortedNodeStats.map((node) => (
+                  <div key={node.id} className="flex items-center justify-between px-3 py-1.5 rounded text-sm hover:bg-accent">
+                    <span className="truncate flex-1 mr-2">{node.name}</span>
+                    <span className={cn("px-2 py-0.5 rounded text-xs font-medium", getStatusColor(node.status))}>
+                      {node.latencyMs != null ? `${node.latencyMs.toFixed(0)}ms` : getStatusLabel(node.status)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 

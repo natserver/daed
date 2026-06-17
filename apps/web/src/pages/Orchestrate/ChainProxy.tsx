@@ -1,8 +1,8 @@
 import type { NodeLatencyProbeResult } from '~/apis'
 import { ArrowRight, Globe, Link, Plus, Search, Trash2, Zap, X } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useGroupsQuery, useSubscriptionsQuery } from '~/apis'
+import { useGroupsQuery, useSubscriptionsQuery, useRunMutation } from '~/apis'
 import { Section } from '~/components/Section'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -27,12 +27,14 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
   const { t } = useTranslation()
   const { data: groupsQuery } = useGroupsQuery()
   const { data: subscriptionsQuery } = useSubscriptionsQuery()
+  const runMutation = useRunMutation()
   const [intermediateNodes, setIntermediateNodes] = useState<ChainNode[]>([])
   const [exitNode, setExitNode] = useState<ChainNode | null>(null)
   const [isAutoSelecting, setIsAutoSelecting] = useState(false)
   const [showNodePicker, setShowNodePicker] = useState<'intermediate' | 'exit' | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all')
+  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const groups = useMemo(() => groupsQuery?.groups ?? [], [groupsQuery?.groups])
   const subscriptions = useMemo(() => subscriptionsQuery?.subscriptions ?? [], [subscriptionsQuery?.subscriptions])
@@ -71,6 +73,19 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
     return Array.from(nodeMap.values())
   }, [groups, subscriptions])
 
+  const triggerReload = useCallback(() => {
+    if (reloadTimeoutRef.current) clearTimeout(reloadTimeoutRef.current)
+    reloadTimeoutRef.current = setTimeout(() => {
+      runMutation.mutate(false)
+    }, 2000)
+  }, [runMutation])
+
+  useEffect(() => {
+    return () => {
+      if (reloadTimeoutRef.current) clearTimeout(reloadTimeoutRef.current)
+    }
+  }, [])
+
   const addIntermediateNode = useCallback((node: ChainNode) => {
     setIntermediateNodes((prev) => {
       if (prev.some((n) => n.id === node.id)) return prev
@@ -78,26 +93,31 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
     })
     setShowNodePicker(null)
     setSearchQuery('')
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const setAsExitNode = useCallback((node: ChainNode) => {
     setExitNode(node)
     setShowNodePicker(null)
     setSearchQuery('')
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const removeIntermediateNode = useCallback((nodeId: string) => {
     setIntermediateNodes((prev) => prev.filter((n) => n.id !== nodeId))
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const removeExitNode = useCallback(() => {
     setExitNode(null)
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const clearChain = useCallback(() => {
     setIntermediateNodes([])
     setExitNode(null)
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const moveNodeUp = useCallback((index: number) => {
     if (index === 0) return
@@ -108,7 +128,8 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
       newChain[index] = temp
       return newChain
     })
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const moveNodeDown = useCallback((index: number) => {
     setIntermediateNodes((prev) => {
@@ -119,7 +140,8 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
       newChain[index + 1] = temp
       return newChain
     })
-  }, [])
+    triggerReload()
+  }, [triggerReload])
 
   const autoSelectBestNodes = useCallback(async () => {
     setIsAutoSelecting(true)
@@ -138,19 +160,19 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
         }))
         .sort((a, b) => (a.latencyMs as number) - (b.latencyMs as number))
 
-      // 最优节点作为落地节点
       if (sortedNodes.length > 0) {
         setExitNode(sortedNodes[0])
       }
 
-      // 其他节点作为中间节点（最多3个）
       if (sortedNodes.length > 1) {
         setIntermediateNodes(sortedNodes.slice(1, 4))
       }
+
+      triggerReload()
     } finally {
       setIsAutoSelecting(false)
     }
-  }, [allNodes, nodeLatencies])
+  }, [allNodes, nodeLatencies, triggerReload])
 
   const selectOptimalExitNode = useCallback(() => {
     setIsAutoSelecting(true)
@@ -162,7 +184,6 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
 
       if (availableNodes.length === 0) return
 
-      // min_moving_avg 逻辑：选择延迟最小的节点作为最优机场节点
       const sortedNodes = availableNodes
         .map((node) => ({
           ...node,
@@ -171,10 +192,11 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
         .sort((a, b) => (a.latencyMs as number) - (b.latencyMs as number))
 
       setExitNode(sortedNodes[0])
+      triggerReload()
     } finally {
       setIsAutoSelecting(false)
     }
-  }, [allNodes, nodeLatencies])
+  }, [allNodes, nodeLatencies, triggerReload])
 
   const totalLatency = useMemo(() => {
     const intermediate = intermediateNodes.reduce((sum, node) => sum + (node.latencyMs || 0), 0)
@@ -213,7 +235,6 @@ export function ChainProxy({ nodeLatencies }: ChainProxyProps) {
       title={t('chainProxy.title', 'Chain Proxy')}
       icon={<Link className="h-5 w-5" />}
       bordered
-      onCreate={() => {}}
       actions={
         <div className="flex items-center gap-1">
           <SimpleTooltip label={t('chainProxy.autoSelect', 'Auto-select best nodes')}>

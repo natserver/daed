@@ -656,10 +656,6 @@ export function OrchestratePage() {
         <ChainProxy nodeLatencies={nodeLatencies} />
         <NodeSpeedTest
           nodeLatencies={nodeLatencies}
-          onTestAllNodeLatencies={async () => {
-            await testNodeLatenciesMutation.mutateAsync(undefined)
-          }}
-          testingLatencies={testNodeLatenciesMutation.isPending}
           lastLatencyProbeAt={lastLatencyProbeAt}
         />
       </div>

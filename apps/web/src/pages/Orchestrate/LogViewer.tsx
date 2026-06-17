@@ -23,7 +23,7 @@ export function LogViewer({ open, onClose }: LogViewerProps) {
   const [logs, setLogs] = useState('')
   const [filter, setFilter] = useState('')
   const [levelFilter, setLevelFilter] = useState<string>('')
-  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
   const [loading, setLoading] = useState(false)
   const [logSize, setLogSize] = useState(0)
   const [showClearDialog, setShowClearDialog] = useState(false)
