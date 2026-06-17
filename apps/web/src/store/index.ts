@@ -84,6 +84,12 @@ export const defaultResourcesAtom = map<DEFAULT_RESOURCES>({
 
 export const colorSchemeAtom = atom<ColorScheme>('dark')
 
+export const tokenWithExpiryAtom = persistentAtom<string | null>('tokenWithExpiry', null)
+
+export function getValidToken(): string | null {
+  return tokenAtom.get() || null
+}
+
 // Persistent storage for group-specific sort orders
 export const groupSortOrdersAtom = persistentAtom<GroupSortOrders>(
   'GROUP_SORT_ORDERS',
