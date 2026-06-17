@@ -4,6 +4,7 @@ import type { GroupsQuery, NodesQuery, SubscriptionsQuery } from '~/schemas/gql/
 import { DragDropContext } from '@hello-pangea/dnd'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Terminal } from 'lucide-react'
 import {
   useConfigsQuery,
   useGroupAddNodesMutation,
@@ -16,14 +17,19 @@ import {
   useTestNodeLatenciesMutation,
 } from '~/apis'
 import type { NodeLatencyProbeResult } from '~/apis'
+import { Button } from '~/components/ui/button'
+import { SimpleTooltip } from '~/components/ui/tooltip'
 import { DraggableResourceType } from '~/constants'
 import { useMediaQuery } from '~/hooks'
 import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
+import { ChainProxy } from './ChainProxy'
 import { Config } from './Config'
 import { DNS } from './DNS'
 import { GroupResource } from './Group'
+import { LogViewer } from './LogViewer'
 import { NODE_DROPPABLE_ID, NodeResource } from './Node'
+import { NodeSpeedTest } from './NodeSpeedTest'
 import { Routing } from './Routing'
 import { SubscriptionResource } from './Subscription'
 import { TrafficOverview } from './TrafficOverview'
@@ -614,16 +620,49 @@ export function OrchestratePage() {
   }
 
   const matchSmallScreen = useMediaQuery('(max-width: 640px)')
+  const [logOpen, setLogOpen] = useState(false)
 
   return (
     <div className="flex flex-col gap-8">
-      <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-3'}`}>
-        <Config />
-        <DNS />
-        <Routing />
+      {/* 顶部：配置 + 日志按钮 */}
+      <div className="flex items-start gap-5">
+        <div className="flex-1 grid gap-5" style={{ gridTemplateColumns: matchSmallScreen ? '1fr' : '1fr 1fr 1fr auto' }}>
+          <Config />
+          <DNS />
+          <Routing />
+          {!matchSmallScreen && (
+            <div className="flex items-center">
+              <SimpleTooltip label={'Logs'}>
+                <Button variant="outline" size="lg" onClick={() => setLogOpen(true)} className="h-full gap-2">
+                  <Terminal className="h-5 w-5" />
+                  <span className="text-sm font-medium">{'Logs'}</span>
+                </Button>
+              </SimpleTooltip>
+            </div>
+          )}
+        </div>
+        {matchSmallScreen && (
+          <SimpleTooltip label={'Logs'}>
+            <Button variant="outline" size="icon" onClick={() => setLogOpen(true)}>
+              <Terminal className="h-5 w-5" />
+            </Button>
+          </SimpleTooltip>
+        )}
       </div>
 
       <TrafficOverview />
+
+      <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        <ChainProxy nodeLatencies={nodeLatencies} />
+        <NodeSpeedTest
+          nodeLatencies={nodeLatencies}
+          onTestAllNodeLatencies={async () => {
+            await testNodeLatenciesMutation.mutateAsync(undefined)
+          }}
+          testingLatencies={testNodeLatenciesMutation.isPending}
+          lastLatencyProbeAt={lastLatencyProbeAt}
+        />
+      </div>
 
       <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
         <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-3'}`}>
@@ -650,6 +689,8 @@ export function OrchestratePage() {
           />
         </div>
       </DragDropContext>
+
+      <LogViewer open={logOpen} onClose={() => setLogOpen(false)} />
     </div>
   )
 }

@@ -7,8 +7,8 @@ import {
   QUERY_KEY_DNS,
   QUERY_KEY_GENERAL,
   QUERY_KEY_GROUP,
-  QUERY_KEY_NODE_LATENCY,
   QUERY_KEY_NODE,
+  QUERY_KEY_NODE_LATENCY,
   QUERY_KEY_ROUTING,
   QUERY_KEY_SUBSCRIPTION,
   QUERY_KEY_USER,
@@ -733,32 +733,42 @@ export function useImportSubscriptionsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: ImportArgument[]) =>
-      Promise.all(
-        data.map((subscription) =>
-          gqlClient.request(
-            graphql(`
-              mutation ImportSubscription($rollbackError: Boolean!, $arg: ImportArgument!) {
-                importSubscription(rollbackError: $rollbackError, arg: $arg) {
-                  link
-                  sub {
-                    id
-                  }
-                  nodeImportResult {
-                    node {
+    mutationFn: async (data: ImportArgument[]) => {
+      const CONCURRENCY_LIMIT = 3
+      const results: unknown[] = []
+
+      for (let i = 0; i < data.length; i += CONCURRENCY_LIMIT) {
+        const batch = data.slice(i, i + CONCURRENCY_LIMIT)
+        const batchResults = await Promise.all(
+          batch.map((subscription) =>
+            gqlClient.request(
+              `
+                mutation ImportSubscription($rollbackError: Boolean!, $arg: ImportArgument!) {
+                  importSubscription(rollbackError: $rollbackError, arg: $arg) {
+                    link
+                    sub {
                       id
+                    }
+                    nodeImportResult {
+                      node {
+                        id
+                      }
                     }
                   }
                 }
-              }
-            `),
-            {
-              rollbackError: false,
-              arg: subscription,
-            },
+              `,
+              {
+                rollbackError: false,
+                arg: subscription,
+              },
+            ),
           ),
-        ),
-      ),
+        )
+        results.push(...batchResults)
+      }
+
+      return results
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY_SUBSCRIPTION })
     },
@@ -770,23 +780,33 @@ export function useUpdateSubscriptionsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (ids: string[]) =>
-      Promise.all(
-        ids.map((id) =>
-          gqlClient.request(
-            graphql(`
-              mutation UpdateSubscription($id: ID!) {
-                updateSubscription(id: $id) {
-                  id
+    mutationFn: async (ids: string[]) => {
+      const CONCURRENCY_LIMIT = 3
+      const results: unknown[] = []
+
+      for (let i = 0; i < ids.length; i += CONCURRENCY_LIMIT) {
+        const batch = ids.slice(i, i + CONCURRENCY_LIMIT)
+        const batchResults = await Promise.all(
+          batch.map((id) =>
+            gqlClient.request(
+              `
+                mutation UpdateSubscription($id: ID!) {
+                  updateSubscription(id: $id) {
+                    id
+                  }
                 }
-              }
-            `),
-            {
-              id,
-            },
+              `,
+              {
+                id,
+              },
+            ),
           ),
-        ),
-      ),
+        )
+        results.push(...batchResults)
+      }
+
+      return results
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY_SUBSCRIPTION })
       queryClient.invalidateQueries({ queryKey: QUERY_KEY_GROUP })
@@ -933,21 +953,17 @@ export function useUpdatePasswordMutation() {
 
   return useMutation({
     mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
-      // Use raw GraphQL string instead of graphql template tag
       const query = `
         mutation UpdatePassword($currentPassword: String!, $newPassword: String!) {
           updatePassword(currentPassword: $currentPassword, newPassword: $newPassword)
         }
       `
-
       return gqlClient.request(query, {
         currentPassword,
         newPassword,
       })
     },
     onSuccess: (data) => {
-      // The mutation returns a new token, which should be handled by the app
-      // to update the authentication state
       return data
     },
   })
@@ -1070,7 +1086,7 @@ export function useUpdateSubscriptionCronMutation() {
               cronEnable
             }
           }
-        `) as any,
+        `),
         {
           id,
           cronExp,

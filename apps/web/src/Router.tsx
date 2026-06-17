@@ -1,13 +1,11 @@
-import { createGraphiQLFetcher } from '@graphiql/toolkit'
-import { useStore } from '@nanostores/react'
-import { GraphiQL } from 'graphiql'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, HashRouter, Route, Routes } from 'react-router-dom'
 
 import { MainLayout, OrchestratePage, SetupPage } from '~/pages'
-import { endpointURLAtom } from '~/store'
+
+const GraphiQLPage = lazy(() => import('~/pages/GraphiQLPage'))
 
 export function Router() {
-  const endpointURL = useStore(endpointURLAtom)
   const RouterType = import.meta.env.DEV ? BrowserRouter : HashRouter
 
   return (
@@ -19,15 +17,13 @@ export function Router() {
 
         <Route path="/setup" element={<SetupPage />} />
 
-        {endpointURL && (
+        {import.meta.env.DEV && (
           <Route
             path="/graphiql"
             element={
-              <GraphiQL
-                fetcher={createGraphiQLFetcher({
-                  url: endpointURL,
-                })}
-              />
+              <Suspense fallback={<div>Loading...</div>}>
+                <GraphiQLPage />
+              </Suspense>
             }
           />
         )}

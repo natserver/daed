@@ -245,10 +245,10 @@
     "label": "Latency",
     "lastTested": "Last tested at {{ time }}",
     "testAllNodes": "Test all node latencies",
-    "testAllNodesWithStatus": "Test all node latencies · Last tested at {{ time }} · {{ count }} nodes measured",
+    "testAllNodesWithStatus": "Last test: {{time}} ({{count}} nodes)",
     "nodesMeasured": "{{ count }} nodes measured",
     "failed": "Failed",
-    "unavailable": "Unavailable"
+    "unavailable": "Latency unavailable"
   },
   "link": "Link",
   "logLevel": "Log Level",
@@ -400,5 +400,35 @@
     "targetPlaceholder": "Target",
     "upstreamNamePlaceholder": "Name (e.g. alidns)",
     "upstreamLinkPlaceholder": "Link (e.g. udp://223.5.5.5:53)"
+  },
+  "chainProxy": {
+    "title": "Chain Proxy",
+    "description": "Chain multiple nodes for enhanced privacy and security. Traffic flows through each node sequentially.",
+    "empty": "No nodes in chain. Add nodes or use auto-select.",
+    "addNode": "Add Node to Chain",
+    "autoSelect": "Auto-select best nodes",
+    "clear": "Clear chain",
+    "nodeCount": "Nodes: {{count}}",
+    "totalLatency": "Total latency: {{latency}}ms"
+  },
+  "speedTest": {
+    "title": "Node Speed Test",
+    "description": "Analyze node performance and find the best node",
+    "testNow": "Test Now",
+    "testAll": "Test all node latencies",
+    "analyze": "Analyze",
+    "noTestData": "No test data available. Click \"Test Now\" to start.",
+    "lastTest": "Last test: {{time}}",
+    "aliveNodes": "Alive Nodes",
+    "fastNodes": "Fast Nodes (<100ms)",
+    "mediumNodes": "Medium Nodes (100-300ms)",
+    "slowDeadNodes": "Slow/Dead Nodes",
+    "bestNode": "Best Node",
+    "noAliveNodes": "No alive nodes found. Check your node configuration.",
+    "fast": "Fast",
+    "medium": "Medium",
+    "slow": "Slow",
+    "dead": "Dead",
+    "unknown": "Unknown"
   }
 }

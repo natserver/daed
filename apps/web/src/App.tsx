@@ -2,6 +2,7 @@ import type { ThemeMode } from '~/store'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
+import { ErrorBoundary } from '~/components/ErrorBoundary'
 import { Toaster } from '~/components/ui/sonner'
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { getThemeById, themeColorsToCSSVars } from '~/constants'
@@ -72,13 +73,15 @@ export function App() {
   }, [colorTheme, colorScheme])
 
   return (
-    <QueryProvider colorScheme={colorScheme} themeMode={themeMode} setThemeMode={setThemeMode}>
-      <TooltipProvider>
-        <div className="h-dvh">
-          <Toaster />
-          <Router />
-        </div>
-      </TooltipProvider>
-    </QueryProvider>
+    <ErrorBoundary>
+      <QueryProvider colorScheme={colorScheme} themeMode={themeMode} setThemeMode={setThemeMode}>
+        <TooltipProvider>
+          <div className="h-dvh">
+            <Toaster />
+            <Router />
+          </div>
+        </TooltipProvider>
+      </QueryProvider>
+    </ErrorBoundary>
   )
 }

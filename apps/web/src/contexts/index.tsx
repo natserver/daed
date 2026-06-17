@@ -7,7 +7,7 @@ import { createContext, use, useMemo } from 'react'
 import { toast } from 'sonner'
 
 import { isMockMode, MockGraphQLClient } from '~/mocks'
-import { endpointURLAtom, tokenAtom } from '~/store'
+import { endpointURLAtom, getValidToken, tokenAtom, tokenWithExpiryAtom } from '~/store'
 
 // Define a common interface for GraphQL clients
 export interface GQLClientInterface {
@@ -52,11 +52,41 @@ interface QueryProviderProps {
   setThemeMode: (mode: ThemeMode) => void
 }
 
+const GQL_TIMEOUT_MS = 30_000
+
+// Custom fetch wrapper with timeout
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), GQL_TIMEOUT_MS)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export function QueryProvider({ children, colorScheme, themeMode, setThemeMode }: QueryProviderProps) {
   const endpointURL = useStore(endpointURLAtom)
   const token = useStore(tokenAtom)
 
-  const queryClient = useMemo(() => new QueryClient(), [])
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: 2,
+            retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+            staleTime: 5_000,
+            refetchOnWindowFocus: false,
+          },
+          mutations: {
+            retry: 1,
+            retryDelay: 1_000,
+          },
+        },
+      }),
+    [],
+  )
 
   const gqlClient = useMemo<GQLClient>(() => {
     // Use mock client in mock mode
@@ -64,10 +94,19 @@ export function QueryProvider({ children, colorScheme, themeMode, setThemeMode }
       return new MockGraphQLClient('mock://localhost')
     }
 
+    const validToken = getValidToken()
+
+    // If token expired but atom still has a value, clear it
+    if (!validToken && token) {
+      tokenAtom.set('')
+      tokenWithExpiryAtom.set(null)
+    }
+
     return new GraphQLClient(endpointURL, {
       headers: {
-        authorization: `Bearer ${token}`,
+        authorization: validToken ? `Bearer ${validToken}` : '',
       },
+      fetch: fetchWithTimeout,
       responseMiddleware: (response) => {
         const error = (response as ClientError).response?.errors?.[0]
 
@@ -76,6 +115,7 @@ export function QueryProvider({ children, colorScheme, themeMode, setThemeMode }
 
           if (error.message === 'access denied') {
             tokenAtom.set('')
+            tokenWithExpiryAtom.set(null)
           }
         }
       },

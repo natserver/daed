@@ -245,10 +245,10 @@
     "label": "延迟",
     "lastTested": "最近测速时间 {{ time }}",
     "testAllNodes": "测试所有节点延迟",
-    "testAllNodesWithStatus": "测试所有节点延迟 · 最近测速时间 {{ time }} · 已测速 {{ count }} 个节点",
+    "testAllNodesWithStatus": "上次测试: {{time}} ({{count}} 个节点)",
     "nodesMeasured": "已测速 {{ count }} 个节点",
     "failed": "失败",
-    "unavailable": "不可用"
+    "unavailable": "延迟不可用"
   },
   "link": "链接",
   "logLevel": "日志等级",
@@ -400,5 +400,35 @@
     "targetPlaceholder": "目标",
     "upstreamNamePlaceholder": "名称 (如 alidns)",
     "upstreamLinkPlaceholder": "链接 (如 udp://223.5.5.5:53)"
+  },
+  "chainProxy": {
+    "title": "链式代理",
+    "description": "将多个节点串联以增强隐私和安全性。流量将依次通过每个节点。",
+    "empty": "链中暂无节点。添加节点或使用自动选择。",
+    "addNode": "添加节点到链",
+    "autoSelect": "自动选择最优节点",
+    "clear": "清空链",
+    "nodeCount": "节点数: {{count}}",
+    "totalLatency": "总延迟: {{latency}}ms"
+  },
+  "speedTest": {
+    "title": "节点测速",
+    "description": "分析节点性能并找到最优节点",
+    "testNow": "立即测试",
+    "testAll": "测试所有节点延迟",
+    "analyze": "分析",
+    "noTestData": "暂无测试数据。点击\"立即测试\"开始。",
+    "lastTest": "上次测试: {{time}}",
+    "aliveNodes": "存活节点",
+    "fastNodes": "快速节点 (<100ms)",
+    "mediumNodes": "中等节点 (100-300ms)",
+    "slowDeadNodes": "慢速/死亡节点",
+    "bestNode": "最优节点",
+    "noAliveNodes": "未找到存活节点。请检查节点配置。",
+    "fast": "快速",
+    "medium": "中等",
+    "slow": "慢速",
+    "dead": "死亡",
+    "unknown": "未知"
   }
 }

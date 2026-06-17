@@ -20,7 +20,22 @@ export default defineConfig(() => {
     },
     plugins: [react(), tailwindcss()],
     build: {
-      chunkSizeWarningLimit: 10 * 1024 * 1024,
+      chunkSizeWarningLimit: 500,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+              return 'react-vendor'
+            }
+            if (id.includes('node_modules/@radix-ui')) {
+              return 'radix-ui'
+            }
+            if (id.includes('node_modules/@tanstack/react-query')) {
+              return 'query-vendor'
+            }
+          },
+        },
+      },
     },
     define: {
       'import.meta.env.APP_VERSION': JSON.stringify(version),

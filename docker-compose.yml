@@ -4,8 +4,17 @@ services:
     privileged: true
     network_mode: host
     pid: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    security_opt:
+      - apparmor:unconfined
     build:
       context: .
     volumes:
       - /sys:/sys
       - /etc/daed:/etc/daed
+    restart: unless-stopped
