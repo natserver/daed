@@ -86,6 +86,12 @@ jobs:
           sudo -E apt-get update
           sudo -E apt-get install -y clang llvm curl jq
 
+      - name: Patch daed Makefile to remove vmlinux-btf dependency
+        if: matrix.arch == 'aarch64_cortex-a53'
+        run: |
+          sed -i 's/+DAED_USE_VMLINUX_BTF:vmlinux-btf//' daed/Makefile
+          sed -i 's/+kmod-sched-bpf/+kmod-sched-bpf/' daed/Makefile
+
       - name: Build packages
         uses: sbwml/openwrt-gh-action-sdk@go1.26
         env:
